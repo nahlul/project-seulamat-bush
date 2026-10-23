@@ -1,0 +1,124 @@
+generator client {
+provider = "prisma-client-js"
+}
+datasource db {
+provider = "postgresql"
+url = env("DATABASE_URL")
+}
+model User {
+id Int @id @default(autoincrement())
+ nama_lengkap String
+ email String @unique
+ password String
+ nik String @unique
+ no_hp String?
+ jenis_kelamin String?
+ role String @default("USER")
+ status_akun String @default("AKTIF")
+ reset_token String?
+ reset_token_exp DateTime?
+ created_at DateTime @default(now())
+ pendaftaran Pendaftaran[]
+}
+model Terminal {
+id Int @id @default(autoincrement())
+ nama String
+ kota String
+ latitude Float
+ longitude Float
+ rute Rute[]
+}
+model Rute {
+id Int @id @default(autoincrement())
+ asal String
+ tujuan String
+ waktu_berangkat DateTime
+ kuota_total Int
+ kuota_terisi Int @default(0)
+ kuota_fix Int @default(0)
+ kuota_menunggu Int @default(0)
+ is_portal_open Boolean @default(true)
+ terminal_id Int?
+ terminal Terminal? @relation(fields:[terminal_id],references:[id])
+ pendaftaran Pendaftaran[]
+ kendaraan Kendaraan[]
+ tanggal_raw Json?
+}
+model Kendaraan {
+id Int @id @default(autoincrement())
+ nama_armada String
+ jenis_kendaraan String @default("Bus Besar")
+ plat_nomor String?
+ kapasitas_total Int
+ nama_supir String?
+ kontak_supir String?
+ terisi Int @default(0)
+ rute_id Int
+ rute Rute @relation(fields:[rute_id],references:[id])
+ pendaftaran Pendaftaran[]
+}
+model Pendaftaran {
+id Int @id @default(autoincrement())
+ kode_booking String? @unique
+ user_id Int?
+ user User? @relation(fields:[user_id],references:[id])
+ id_keluarga Int?
+ rute_id Int
+ rute Rute @relation(fields:[rute_id],references:[id])
+ kendaraan_id Int?
+ kendaraan Kendaraan? @relation(fields:[kendaraan_id],references:[id])
+ nama_kepala_keluarga String
+ nama_peserta String
+ nik_peserta String
+ jenis_kelamin String?
+ tanggal_lahir DateTime?
+ kategori_penumpang String?
+ jenis_identitas String?
+ alamat_rumah String?
+ no_hp_peserta String?
+ no_hp_target String?
+ foto_bukti String?
+ status String @default("MENUNGGU VERIFIKASI")
+ alasan_tolak String?
+ is_kepala_keluarga Boolean @default(false)
+ konfirmasi_hadir Boolean @default(false)
+ konfirmasi_uuid String? @unique
+ link_konfirmasi_dikirim Boolean @default(false)
+ konfirmasi_kirim_count Int @default(0)
+ uuid String? @default(uuid())
+ rute_tujuan String?
+ tgl_berangkat String?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+}
+model PortalSetting {
+id Int @id @default(1)
+ sesi_aktif Boolean @default(true)
+ portal_register_open Boolean @default(true)
+ portal_login_open Boolean @default(true)
+ portal_mudik_open Boolean @default(true)
+ portal_tiket_open Boolean @default(true)
+ ulasan_open Boolean @default(false)
+ pesan_sesi_berakhir String @default("Program Mudik Gratis telah selesai.")
+ pesan_register_tutup String @default("Pendaftaran akun baru saat ini ditutup.")
+ pesan_login_tutup String @default("Login saat ini tidak tersedia.")
+ pesan_mudik_tutup String @default("Pendaftaran Mudik Gratis saat ini ditutup.")
+ pesan_tiket_tutup String @default("Download tiket saat ini tidak tersedia.")
+ pesan_home String?
+ pesan_dashboard String?
+ countdown_aktif Boolean @default(false)
+ countdown_target String?
+ countdown_label String? @default("Mudik Gratis Dimulai")
+ updated_at DateTime @updatedAt
+ updated_by String?
+}
+model Feedback {
+id Int @id @default(autoincrement())
+ rating Int
+ komentar String?
+ nama_pengirim String?
+ disetujui Boolean @default(false)
+ user_id Int?
+ dikirim_at DateTime @default(now())
+ created_at DateTime @default(now())
+}

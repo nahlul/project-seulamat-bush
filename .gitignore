@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Build/cache output
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime uploads and logs
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/storage/*
+!backend/storage/documents/.gitkeep
+logs/
+*.log
+npm-debug.log*
+
+# Local/editor files
+**/.vscode/*
+!**/.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.njsproj
+*.sln
+
+# Temporary backups and patches
+*.bak
+*.pre-fix-*
