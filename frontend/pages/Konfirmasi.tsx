@@ -106,9 +106,9 @@ export default function Konfirmasi() {
         const loggedInUser = localStorage.getItem("userId")?.replace(/"/g, "");
 
         try {
-            // 🔥 FIX 3: Pastikan URL param pakai loggedInUser kalau userId dari URL kosong/undefined
-            const targetId = userId && userId !== 'undefined' ? userId : loggedInUser;
-            const url = `${API.PENDAFTARAN}/konfirmasi-kehadiran/${targetId}`;
+            // Gunakan endpoint berbasis daftar ID pendaftaran milik sesi login.
+            // Jangan kirim userId/ID URL sebagai ID pendaftaran: keduanya berbeda.
+            const url = API.KONFIRMASI;
 
             const res = await fetch(url, {
                 method: "PUT",

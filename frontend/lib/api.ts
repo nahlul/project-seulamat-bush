@@ -163,7 +163,9 @@ export async function apiRequest<T = any>(
   });
 
   if (res.status === 401 || res.status === 403) {
-    if (!url.includes("/login") && !url.includes("/auth/")) {
+    // Hanya endpoint yang memang memerlukan sesi yang boleh memunculkan
+    // peringatan auth; request publik tidak boleh dianggap sesi kadaluarsa.
+    if (auth && !url.includes("/login") && !url.includes("/auth/")) {
       console.error("⛔ Sesi habis atau tidak punya akses.");
     }
   }
