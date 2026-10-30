@@ -9,7 +9,7 @@ import {
     Lock, ShieldAlert, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, X,
     TrendingUp, BarChart3, CheckSquare
 } from 'lucide-react';
-import { AdminAPI, API, BASE_URL } from '../lib/api';
+import { AdminAPI, API, BASE_URL, apiRequest } from '../lib/api';
 import ModalVerifikasi from '../components/admin/ModalVerifikasi';
 import ModalBatal from '../components/admin/ModalBatal';
 
@@ -17,6 +17,7 @@ import ModalBatal from '../components/admin/ModalBatal';
 interface Pendaftar {
     id: number;
     uuid: string;
+    konfirmasi_uuid?: string;
     nama_peserta: string;
     nik_peserta: string;
     no_hp_target: string;
@@ -205,22 +206,18 @@ export default function AdminPendaftar() {
     }, [searchInput]);
 
     useEffect(() => {
-        fetch(`${API.RUTE}/admin`)
-            .then(r => r.json())
-            .then(json => { if (Array.isArray(json)) setAllRuteObjects(json); })
-            .catch(() => {
-                fetch(`${API.RUTE}`)
-                    .then(r => r.json())
-                    .then(json => { if (Array.isArray(json)) setAllRuteObjects(json); })
-                    .catch(() => {});
-            });
-
         const token = localStorage.getItem("token");
-        fetch(`${API.BASE_URL}/api/admin/stats`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API.RUTE}/admin`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => { if (!r.ok) throw new Error(`rute ${r.status}`); return r.json(); })
+            .then(json => { if (Array.isArray(json)) setAllRuteObjects(json); })
+            .catch(() => setAllRuteObjects([]));
+
+        const adminToken = localStorage.getItem("token");
+        fetch(`${API.BASE_URL}/api/admin/stats`, { headers: { Authorization: `Bearer ${adminToken}` } })
             .then(r => r.json())
             .then(json => setGlobalStats(json))
             .catch(() => {});
-        fetch(`${API.ADMIN_KENDARAAN}`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API.ADMIN_KENDARAAN}`, { headers: { Authorization: `Bearer ${adminToken}` } })
             .then(r => r.json())
             .then(json => { if (Array.isArray(json)) setAllBuses(json); })
             .catch(() => {});
@@ -246,15 +243,13 @@ export default function AdminPendaftar() {
             else if (filterRute) params.append("rute", filterRute);
             if (filterStatus) params.append("status", filterStatus);
 
-            const [res, ruteRes] = await Promise.all([
-                fetch(`${API.BASE_URL}/api/admin/pendaftar/paginated?${params.toString()}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                }),
-                fetch(`${API.RUTE}/admin`)
+            const [pendaftarResult, ruteResult] = await Promise.allSettled([
+                apiRequest<PaginatedResponse>(`${API.BASE_URL}/api/admin/pendaftar/paginated?${params.toString()}`),
+                apiRequest<any[]>(`${API.RUTE}/admin`),
             ]);
 
-            if (res.ok) {
-                const json: PaginatedResponse = await res.json();
+            if (pendaftarResult.status === 'fulfilled') {
+                const json = pendaftarResult.value;
                 if (json && Array.isArray(json.data)) {
                     setData(json.data.filter((d: any) => d && d.id));
                     setTotalPages(json.totalPages || 1);
@@ -262,9 +257,8 @@ export default function AdminPendaftar() {
                     setLastRefresh(new Date());
                 }
             }
-            if (ruteRes.ok) {
-                const ruteJson = await ruteRes.json();
-                if (Array.isArray(ruteJson)) setAllRuteObjects(ruteJson);
+            if (ruteResult.status === 'fulfilled' && Array.isArray(ruteResult.value)) {
+                setAllRuteObjects(ruteResult.value);
             }
         } catch(e) { console.error("Gagal load data:", e); }
         finally { setIsRefreshing(false); }
@@ -291,7 +285,7 @@ export default function AdminPendaftar() {
         if (!noHp || noHp.length < 5) return;
         let hp = noHp.replace(/\D/g, "");
         if (hp.startsWith("0")) hp = "62" + hp.substring(1);
-        const konfirmasiLink = `${window.location.origin}/konfirmasi/${head.uuid}`;
+        const konfirmasiLink = `${window.location.origin}/konfirmasi/${head.konfirmasi_uuid || head.uuid}`;
         let text = "";
         const nama = head.nama_kepala_keluarga || head.nama_peserta;
         if (action === 'DITERIMA H-3') {
@@ -451,8 +445,8 @@ export default function AdminPendaftar() {
         try {
             const token = localStorage.getItem("token");
             const res = await fetch(
-                `${API.ADMIN_ASSIGN_BUS}?user_id=${selectedFamilyId}&kendaraan_id=${selectedBusId}`,
-                { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+                API.ADMIN_ASSIGN_BUS,
+                { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ family_id: selectedFamilyId, kendaraan_id: Number(selectedBusId) }) }
             );
             const json = await res.json();
             if (res.ok) {
@@ -487,7 +481,7 @@ export default function AdminPendaftar() {
         if (!window.confirm(`Batalkan plotting bus untuk keluarga "${head.nama_kepala_keluarga || head.nama_peserta}"?`)) return;
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API.BASE_URL}/api/admin/batalkan-plotting/${familyId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API.BASE_URL}/api/admin/batalkan-plotting/${familyId}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ id: familyId }) });
             const json = await res.json();
             if (res.ok) { alert(`✅ ${json.pesan}`); loadData(); addNotif({ type: 'pendaftar', title: '🚌 Plotting Dibatalkan', message: `Plotting bus keluarga ${head.nama_kepala_keluarga || head.nama_peserta} berhasil dibatalkan.`, link: '/admin/verifikasi' }); }
             else { alert('Gagal: ' + (json.error || 'Terjadi kesalahan')); }

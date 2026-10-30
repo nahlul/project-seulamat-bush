@@ -42,6 +42,7 @@ export default function Login() {
       if (!res.ok) { setModalTitle("Login Gagal"); setModalMsg(data?.error || data?.message || "Email atau password salah."); setShowModal(true); return }
       if (data?.token) {
         localStorage.setItem("token", data.token)
+        localStorage.setItem("role", data.role || "USER")
         if (data.nama) localStorage.setItem("nama", data.nama)
         const decoded = parseJwt(data.token)
         const userId = data.id_user || data.userId || decoded?.id_user || decoded?.userId || decoded?.sub || decoded?.upn

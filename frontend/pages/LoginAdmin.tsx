@@ -38,7 +38,7 @@ export default function LoginAdmin() {
         localStorage.setItem("nama", data.nama)
         if (data.userId) localStorage.setItem("userId", data.userId)
 
-        navigate("/admin/dashboard")
+        window.location.assign("/admin/dashboard")
       } else {
         localStorage.clear()
         throw new Error("⛔ Akses ditolak! Akun bukan administrator.")

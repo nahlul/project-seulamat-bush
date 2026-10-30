@@ -46,7 +46,11 @@ const ProtectedRoute = ({
   role: "USER" | "ADMIN"
 }) => {
   const token = localStorage.getItem("token")
-  if (!token) {
+  const storedRole = localStorage.getItem("role")?.replace(/["']/g, "").toUpperCase()
+  if (!token || (storedRole && storedRole !== role)) {
+    localStorage.removeItem("token")
+    localStorage.removeItem("userId")
+    localStorage.removeItem("role")
     return <Navigate to={role === "ADMIN" ? "/admin/login" : "/login"} replace />
   }
   return <>{children}</>
@@ -132,7 +136,7 @@ function AnimatedRoutes() {
 
         {/* ===== ADMIN (butuh login admin) ===== */}
         {/* NotificationProvider khusus admin — tidak aktif di halaman user/publik */}
-        <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
         <Route path="/admin/login" element={<PageWrapper><LoginAdmin /></PageWrapper>} />
 

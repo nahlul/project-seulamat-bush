@@ -1160,14 +1160,14 @@ export default function AdminRute() {
 
     const notifKuotaPenuh = async (id: number) => {
         if (!confirm('Kirim notifikasi WA kuota penuh?')) return;
-        const res = await fetch(`/api/admin/notif-kuota-penuh/${id}`, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` } });
+        const res = await fetch(API.ADMIN_NOTIF_KUOTA_PENUH(id), { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` } });
         const json = await res.json();
         if (res.ok) alert(`✅ ${json.pesan}`); else alert('❌ ' + (json.error || 'Gagal'));
     };
 
     const resyncKuota = async (ruteId?: number) => {
         if (!confirm(`Sinkronkan ulang kuota ${ruteId ? 'rute ini' : 'SEMUA rute'} dari database aktual?`)) return;
-        const url = ruteId ? `/api/admin/resync-kuota?rute_id=${ruteId}` : '/api/admin/resync-kuota';
+        const url = ruteId ? `${API.BASE_URL}/api/admin/resync-kuota?rute_id=${ruteId}` : `${API.BASE_URL}/api/admin/resync-kuota`;
         const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` } });
         const json = await res.json();
         if (res.ok) {

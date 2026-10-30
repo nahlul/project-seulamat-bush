@@ -254,7 +254,7 @@ export default function PetaSebaran() {
       const [petaRes, busRes] = await Promise.all([
         fetch(API.PETA).then(r => r.json()),
         fetch(API.ADMIN_KENDARAAN, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
+          headers: { Authorization: `Bearer ${(localStorage.getItem("token") || "").replace(/["']/g, "")}` }
         }).then(r => r.json()),
       ]);
 

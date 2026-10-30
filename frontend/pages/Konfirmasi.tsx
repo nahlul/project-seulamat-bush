@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, User, AlertTriangle, Loader2 } from 'lucide-react
 import { API } from '../lib/api';
 
 export default function Konfirmasi() {
-    const { userId } = useParams();
+    const { uuid } = useParams<{ uuid: string }>();
     const navigate = useNavigate();
     const [list, setList] = useState<any[]>([]);
     const [checkedIds, setCheckedIds] = useState<number[]>([]);
@@ -16,72 +16,40 @@ export default function Konfirmasi() {
     }, []);
 
     const fetchData = async () => {
-        const token = localStorage.getItem("token");
-        const loggedInUser = localStorage.getItem("userId")?.replace(/"/g, "");
-
-        if(!token || !loggedInUser) {
-            alert("Sesi habis. Silakan login kembali.");
-            return navigate("/login");
+        if (!uuid) {
+            alert("Link konfirmasi tidak valid.");
+            setLoading(false);
+            return;
         }
 
         try {
-            const res = await fetch(API.RIWAYAT, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "userId": loggedInUser
-                }
+            const token = localStorage.getItem("token");
+            const headers: Record<string, string> = token ? { Authorization: `Bearer ${token.replace(/["']/g, "")}` } : {};
+            const res = await fetch(`${API.RIWAYAT}?konfirmasi_uuid=${encodeURIComponent(uuid)}`, { headers });
+            const data = await res.json();
+            if (!res.ok || !Array.isArray(data)) {
+                alert(data?.error || "Link konfirmasi tidak ditemukan atau sudah tidak tersedia.");
+                return;
+            }
+
+            const relevantData = data.filter((d: any) => {
+                const status = String(d.status_pendaftaran || "").toUpperCase();
+                return ["DISETUJUI", "DITERIMA", "DITERIMA H-3", "TERKONFIRMASI", "SIAP BERANGKAT"].includes(status)
+                    && d.link_konfirmasi_dikirim === true;
             });
-
-            // 🔥 FIX 1: Tangani Error JSON (Biar gak blank putih)
-            const textResponse = await res.text();
-            let data;
-            try {
-                data = JSON.parse(textResponse);
-            } catch (err) {
-                console.error("Server Response Error (Not JSON):", textResponse);
-                setLoading(false);
-                return; // Stop disini kalau bukan JSON
+            if (relevantData.length === 0) {
+                alert("Tidak ada peserta yang memenuhi syarat konfirmasi saat ini.");
+                return;
             }
-
-            if (res.ok && Array.isArray(data)) {
-                // 🔥 FIX 2: Filter Status yang LEBIH FLEKSIBEL (Pake .includes)
-                // Ini akan menangkap: "DITERIMA", "DITERIMA H-3", "DITERIMA(H-3)", "TERVERIFIKASI/ SIAP BERANGKAT"
-                const relevantData = data.filter((d:any) => {
-                    const status = (d.status_pendaftaran || "").toUpperCase();
-                    return status.includes('DITERIMA') ||
-                           status.includes('TERKONFIRMASI') ||
-                           status.includes('SIAP') ||
-                           status.includes('VERIFIKASI');
-                });
-
-                if (relevantData.length === 0) {
-                    // Jangan langsung navigate, kasih user liat pesan dulu atau stay di page
-                    alert("Tidak ada tiket yang perlu dikonfirmasi saat ini (Status belum Diterima H-3).");
-                    return navigate("/dashboard");
-                }
-
-                // 🔒 CEK: Apakah admin sudah kirim link konfirmasi?
-                const sudahDikirim = relevantData.some((d: any) => d.link_konfirmasi_dikirim === true);
-                if (!sudahDikirim) {
-                    alert("⏳ Konfirmasi belum tersedia.\n\nAdmin belum mengirim link konfirmasi untuk akun Anda.\n\nSilakan tunggu link konfirmasi dikirim oleh Admin Dishub Aceh sesuai jadwal.");
-                    return navigate("/dashboard");
-                }
-
-                setList(relevantData);
-
-                // Auto-Checklist semua di awal
-                const idsToSelect = relevantData.map((d:any) => d.pendaftaran_id);
-                setCheckedIds(idsToSelect);
-            } else {
-                console.error("Gagal load data:", data);
-            }
+            setList(relevantData);
+            setCheckedIds(relevantData.map((d: any) => d.pendaftaran_id));
         } catch (error) {
             console.error("Error connection:", error);
+            alert("Gagal memuat link konfirmasi. Periksa koneksi internet.");
         } finally {
             setLoading(false);
         }
     };
-
     const handleCheck = (id: number) => {
         if(checkedIds.includes(id)) {
             setCheckedIds(checkedIds.filter(cid => cid !== id));
@@ -102,20 +70,13 @@ export default function Konfirmasi() {
         if(!confirm(confirmMsg)) return;
 
         setSubmitting(true);
-        const token = localStorage.getItem("token");
-        const loggedInUser = localStorage.getItem("userId")?.replace(/"/g, "");
-
         try {
-            // Gunakan endpoint berbasis daftar ID pendaftaran milik sesi login.
-            // Jangan kirim userId/ID URL sebagai ID pendaftaran: keduanya berbeda.
-            const url = API.KONFIRMASI;
-
-            const res = await fetch(url, {
+            const token = localStorage.getItem("token");
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (token) headers.Authorization = `Bearer ${token.replace(/["']/g, "")}`;
+            const res = await fetch(API.KONFIRMASI, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
+                headers,
                 body: JSON.stringify({ ids_konfirmasi: checkedIds })
             });
 

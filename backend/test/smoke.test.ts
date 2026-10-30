@@ -215,3 +215,65 @@ test('multipart registration stores the frontend passenger arrays as one family'
     server.close();
   }
 });
+
+test('regression: counts passengers, blocks overbooking, protects confirmation, and serves manifest data', async () => {
+  const suffix = crypto.randomUUID().replaceAll('-', '');
+  const password = 'QaRegression123!';
+  const digits = crypto.randomBytes(8).readBigUInt64BE().toString().padStart(16, '0');
+  const [adminUser, user] = await Promise.all([
+    prisma.user.create({data:{nama_lengkap:'Admin Regression',email:`admin-regression-${suffix}@contoh.com`,password:await bcrypt.hash(password,4),nik:`${digits.slice(0,15)}1`,role:'ADMIN'}}),
+    prisma.user.create({data:{nama_lengkap:'User Regression',email:`user-regression-${suffix}@contoh.com`,password:await bcrypt.hash(password,4),nik:`${digits.slice(0,15)}2`,role:'USER'}}),
+  ]);
+  const route = await prisma.rute.create({data:{asal:'Banda Aceh',tujuan:`Regression ${suffix.slice(0,6)}`,waktu_berangkat:new Date('2027-04-12T07:00:00.000Z'),kuota_total:10}});
+  const bus = await prisma.kendaraan.create({data:{nama_armada:`QA Bus ${suffix.slice(0,6)}`,jenis_kendaraan:'Bus Besar',kapasitas_total:1,rute_id:route.id}});
+  const makePassenger = (name:string,status:string,kendaraan_id:number|null=null) => prisma.pendaftaran.create({data:{user_id:user.id,id_keluarga:null,rute_id:route.id,kendaraan_id,nama_kepala_keluarga:name,nama_peserta:name,nik_peserta:`${digits.slice(0,14)}${Math.floor(Math.random()*90+10)}`,status,konfirmasi_uuid:crypto.randomUUID(),link_konfirmasi_dikirim:true}});
+  const approvedOnBus = await makePassenger('Approved On Bus','DITERIMA H-3',bus.id);
+  const approvedUnassigned = await makePassenger('Approved Unassigned','DITERIMA H-3');
+  const pending = await makePassenger('Pending Passenger','MENUNGGU VERIFIKASI');
+  const server = app.listen(0);
+  const address = server.address() as {port:number};
+  const base = `http://127.0.0.1:${address.port}`;
+  const headers = (token:string) => ({authorization:`Bearer ${token}`,'content-type':'application/json'});
+  let routeRemoved = false;
+  try {
+    const login = async (email:string) => {
+      const response = await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password})});
+      assert.equal(response.status,200);
+      return (await response.json() as {token:string}).token;
+    };
+    const [adminToken,userToken] = await Promise.all([login(adminUser.email),login(user.email)]);
+    const vehicles = await fetch(`${base}/api/admin/kendaraan?rute_id=${route.id}`,{headers:headers(adminToken)});
+    assert.equal(vehicles.status,200);
+    const vehicleRows = await vehicles.json() as Array<{id:number;terisi:number;sisa_kursi:number}>;
+    assert.equal(vehicleRows.find(row=>row.id===bus.id)?.terisi,1);
+    assert.equal(vehicleRows.find(row=>row.id===bus.id)?.sisa_kursi,0);
+
+    const routes = await fetch(`${base}/api/rute/admin`,{headers:headers(adminToken)});
+    assert.equal(routes.status,200);
+    const routeRow = (await routes.json() as Array<{rute_id:number;total_daftar:number;diterima:number;sisa_kuota:number}>).find(row=>row.rute_id===route.id)!;
+    assert.deepEqual({total_daftar:routeRow.total_daftar,diterima:routeRow.diterima,sisa_kuota:routeRow.sisa_kuota},{total_daftar:3,diterima:2,sisa_kuota:8});
+
+    const overbook = await fetch(`${base}/api/admin/assign-bus`,{method:'POST',headers:headers(adminToken),body:JSON.stringify({user_id:approvedUnassigned.id,kendaraan_id:bus.id})});
+    assert.equal(overbook.status,409);
+
+    const pendingConfirmation = await fetch(`${base}/api/pendaftaran/konfirmasi-kehadiran`,{method:'PUT',headers:headers(userToken),body:JSON.stringify({ids_konfirmasi:[pending.id]})});
+    assert.equal(pendingConfirmation.status,403);
+    const approvedConfirmation = await fetch(`${base}/api/pendaftaran/konfirmasi-kehadiran`,{method:'PUT',headers:headers(userToken),body:JSON.stringify({ids_konfirmasi:[approvedUnassigned.id]})});
+    assert.equal(approvedConfirmation.status,200);
+    assert.equal((await prisma.pendaftaran.findUnique({where:{id:approvedUnassigned.id}}))?.status,'TERKONFIRMASI');
+
+    const manifest = await fetch(`${base}/api/manifest`,{headers:headers(adminToken)});
+    assert.equal(manifest.status,200);
+    const manifestRows = await manifest.json() as Array<{rute_id:number;total_penumpang:number;bus:Array<{id:number;terisi:number;sisa_kursi:number}>}>;
+    const manifestRoute = manifestRows.find(row=>row.rute_id===route.id)!;
+    assert.equal(manifestRoute.total_penumpang,1);
+    assert.equal(manifestRoute.bus.find(row=>row.id===bus.id)?.sisa_kursi,0);
+  } finally {
+    server.close();
+    await prisma.pendaftaran.deleteMany({where:{id:{in:[approvedOnBus.id,approvedUnassigned.id,pending.id]}}});
+    await prisma.kendaraan.delete({where:{id:bus.id}});
+    await prisma.rute.delete({where:{id:route.id}});
+    routeRemoved = true;
+    await prisma.user.deleteMany({where:{id:{in:[adminUser.id,user.id]}}});
+  }
+});

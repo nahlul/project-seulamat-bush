@@ -166,7 +166,14 @@ export async function apiRequest<T = any>(
     // Hanya endpoint yang memang memerlukan sesi yang boleh memunculkan
     // peringatan auth; request publik tidak boleh dianggap sesi kadaluarsa.
     if (auth && !url.includes("/login") && !url.includes("/auth/")) {
-      console.error("⛔ Sesi habis atau tidak punya akses.");
+      localStorage.removeItem("token");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("role");
+      if (typeof window !== "undefined") {
+        const adminPath = window.location.pathname.startsWith("/admin");
+        const loginPath = adminPath ? "/admin/login" : "/login";
+        if (window.location.pathname !== loginPath) window.location.assign(loginPath);
+      }
     }
   }
 
@@ -207,7 +214,19 @@ export async function downloadFile(
     headers["userid"] = userId;
   }
 
-  const res = await fetch(url, { headers });
+  const fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
+  const res = await fetch(fullUrl, { headers });
+
+  if (res.status === 401 || res.status === 403) {
+    const path = new URL(fullUrl, window.location.origin).pathname;
+    if (!path.includes("/login") && !path.includes("/auth/")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("role");
+      if (window.location.pathname.startsWith("/admin")) window.location.assign("/admin/login");
+      else if (window.location.pathname !== "/login") window.location.assign("/login");
+    }
+  }
 
   if (!res.ok) {
     let errMsg = res.statusText;
@@ -360,12 +379,8 @@ export const UserAPI = {
       `Tiket_Mudik_${namaPeserta.replace(/\s+/g, "_")}.pdf`
     ),
 
-  konfirmasi: (userId: string, ids: number[]) =>
-    apiRequest(
-      `${API.KONFIRMASI}/${userId}`,
-      "PUT",
-      { ids_konfirmasi: ids }
-    ),
+  konfirmasi: (_userId: string, ids: number[]) =>
+    apiRequest(API.KONFIRMASI, "PUT", { ids_konfirmasi: ids }),
 
   getProfile: () => apiRequest<any>(API.PROFILE),
 

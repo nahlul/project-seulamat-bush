@@ -249,13 +249,13 @@ export default function AdminTambahPenumpang() {
 
                 const payload: any = {
                     rute_id: parseInt(ruteId),
-                    user_id: selectedUser.user_id,
+                    user_id: selectedUser.id ?? selectedUser.user_id,
                     nama_peserta: p.nama_peserta.toUpperCase(),
                     nik_peserta: p.nik_peserta.trim(),
                     jenis_kelamin: p.jenis_kelamin,
-                    tanggal_lahir: p.tanggal_lahir || null,
+                    tanggal_lahir: p.tanggal_lahir,
                     alamat_rumah: p.alamat_rumah || '-',
-                    no_hp_peserta: p.no_hp_peserta || null,
+                    no_hp_peserta: p.no_hp_peserta || '-',
                     jenis_identitas: p.jenis_identitas,
                     foto_identitas_path: fotoPath,
                 };

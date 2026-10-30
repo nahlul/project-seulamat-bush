@@ -16,7 +16,7 @@ import { useAdminNotifPoller } from "../hooks/useAdminNotifPoller"
 
 // ─── Sidebar Menu Items ───────────────────────────────────────
 const MENU = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/admin" },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
   { id: "verifikasi", label: "Verifikasi Pendaftar", icon: Users, path: "/admin/verifikasi", badge: "pending" },
   { id: "kendaraan", label: "Armada Bus", icon: Bus, path: "/admin/kendaraan" },
   { id: "rute", label: "Rute & Jadwal", icon: Map, path: "/admin/rute" },
@@ -41,8 +41,7 @@ function PortalWidget() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${API.BASE_URL}/api/portal/status`)
-      const data = await res.json()
+      const data = await PortalAPI.getStatus()
       setStatus(data)
       setError(false)
     } catch { setError(true) }
