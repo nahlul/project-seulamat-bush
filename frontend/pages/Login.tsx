@@ -45,7 +45,15 @@ export default function Login() {
         localStorage.setItem("role", data.role || "USER")
         if (data.nama) localStorage.setItem("nama", data.nama)
         const decoded = parseJwt(data.token)
-        const userId = data.id_user || data.userId || decoded?.id_user || decoded?.userId || decoded?.sub || decoded?.upn
+        const userId =
+          data.userId ||
+          data.id ||
+          data.id_user ||
+          decoded?.id ||
+          decoded?.userId ||
+          decoded?.id_user ||
+          decoded?.sub ||
+          decoded?.upn
         localStorage.setItem("userId", userId ? String(userId) : email)
         setModalTitle("Login Berhasil"); setModalMsg(`Selamat datang kembali, ${data.nama ?? "User"}!`); setShowModal(true)
         setTimeout(() => navigate("/dashboard"), 1500)

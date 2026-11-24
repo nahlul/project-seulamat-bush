@@ -86,7 +86,30 @@ export default function DaftarMudik() {
   // --- AUTH ---
   const getUserId = () => {
     const uid = localStorage.getItem("userId")
-    return uid ? uid.replace(/"/g, "") : null
+    if (uid && uid.replace(/"/g, "").trim() && uid.replace(/"/g, "").trim() !== "undefined") {
+      return uid.replace(/"/g, "").trim()
+    }
+    // Fallback: beberapa alur lama hanya menyimpan token tanpa userId.
+    // Ambil id dari klaim JWT lalu simpan agar sesi konsisten.
+    const token = localStorage.getItem("token")
+    if (!token) return null
+    try {
+      const base64Url = token.split(".")[1]
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+      const payload = JSON.parse(
+        decodeURIComponent(
+          atob(base64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+        )
+      )
+      const id = payload?.id_user || payload?.userId || payload?.id || payload?.sub
+      if (id !== undefined && id !== null && String(id).trim() !== "") {
+        localStorage.setItem("userId", String(id))
+        return String(id)
+      }
+    } catch {
+      /* abaikan token rusak */
+    }
+    return null
   }
 
   const calculateAge = (birthDate: string) => {
@@ -100,7 +123,10 @@ export default function DaftarMudik() {
   }
 
   useEffect(() => {
-    if (!getUserId()) { alert("Anda belum login!"); navigate("/login"); }
+    // Guard halus: kalau sesi tidak lengkap, cukup arahkan ke login tanpa popup.
+    // Popup "Anda belum login!" muncul dulu karena alur lama hanya menyimpan token
+    // tanpa userId — sekarang getUserId() menariknya dari klaim JWT.
+    if (!getUserId()) navigate("/login", { replace: true });
   }, [navigate])
 
   // --- LOAD RUTE ---
